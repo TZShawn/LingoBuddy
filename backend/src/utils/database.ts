@@ -1,0 +1,153 @@
+import { createClient } from '@supabase/supabase-js';
+import { User, Conversation, Interaction } from '../types';
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// User operations
+export async function createUser(email: string, password: string): Promise<User> {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Failed to create user');
+
+  return {
+    id: data.user.id,
+    email: data.user.email!,
+    created_at: data.user.created_at,
+  };
+}
+
+export async function authenticateUser(email: string, password: string): Promise<User> {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Authentication failed');
+
+  return {
+    id: data.user.id,
+    email: data.user.email!,
+    created_at: data.user.created_at,
+  };
+}
+
+// Conversation operations
+export async function createConversation(
+  userId: string,
+  language: string,
+  title?: string
+): Promise<Conversation> {
+  const conversationData = {
+    user_id: userId,
+    language,
+    title: title || `Conversation in ${language}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert(conversationData)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getConversations(userId: string): Promise<Conversation[]> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getConversation(conversationId: string, userId: string): Promise<Conversation> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteConversation(conversationId: string, userId: string): Promise<void> {
+  // First delete all interactions
+  await supabase
+    .from('interactions')
+    .delete()
+    .eq('conversation_id', conversationId);
+
+  // Then delete the conversation
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}
+
+// Interaction operations
+export async function createInteraction(
+  conversationId: string,
+  userMessage: string,
+  aiResponse?: string
+): Promise<Interaction> {
+  const interactionData = {
+    conversation_id: conversationId,
+    user_message: userMessage,
+    ai_response: aiResponse || '',
+    created_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('interactions')
+    .insert(interactionData)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateInteraction(
+  interactionId: string,
+  aiResponse: string
+): Promise<Interaction> {
+  const { data, error } = await supabase
+    .from('interactions')
+    .update({ ai_response: aiResponse })
+    .eq('id', interactionId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getConversationInteractions(conversationId: string): Promise<Interaction[]> {
+  const { data, error } = await supabase
+    .from('interactions')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}

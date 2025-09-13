@@ -1,0 +1,111 @@
+service: lingobuddy-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    SUPABASE_URL: ${env:SUPABASE_URL}
+    SUPABASE_ANON_KEY: ${env:SUPABASE_ANON_KEY}
+    SUPABASE_SERVICE_KEY: ${env:SUPABASE_SERVICE_KEY}
+    DEEPGRAM_API_KEY: ${env:DEEPGRAM_API_KEY}
+    OPENAI_API_KEY: ${env:OPENAI_API_KEY}
+    ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: '*'
+
+functions:
+  # Authentication
+  signup:
+    handler: src/handlers/auth.signup
+    events:
+      - http:
+          path: auth/signup
+          method: post
+          cors: true
+
+  login:
+    handler: src/handlers/auth.login
+    events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+
+  # Conversations
+  createConversation:
+    handler: src/handlers/conversations.create
+    events:
+      - http:
+          path: conversations
+          method: post
+          cors: true
+
+  getConversations:
+    handler: src/handlers/conversations.list
+    events:
+      - http:
+          path: conversations
+          method: get
+          cors: true
+
+  getConversation:
+    handler: src/handlers/conversations.get
+    events:
+      - http:
+          path: conversations/{id}
+          method: get
+          cors: true
+
+  deleteConversation:
+    handler: src/handlers/conversations.deleteConversationHandler
+    events:
+      - http:
+          path: conversations/{id}
+          method: delete
+          cors: true
+
+  # Speech Processing
+  transcribeSpeech:
+    handler: src/handlers/speech.transcribe
+    events:
+      - http:
+          path: speech/transcribe
+          method: post
+          cors: true
+
+  generateResponse:
+    handler: src/handlers/speech.generateResponse
+    events:
+      - http:
+          path: speech/generate-response
+          method: post
+          cors: true
+
+  # Languages
+  getLanguages:
+    handler: src/handlers/languages.list
+    events:
+      - http:
+          path: languages
+          method: get
+          cors: true
+
+plugins:
+  - serverless-plugin-typescript
+
+package:
+  patterns:
+    - '!node_modules/.cache/**'
+    - '!.git/**'
+    - '!.env*'
