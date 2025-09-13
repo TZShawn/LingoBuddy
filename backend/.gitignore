@@ -131,3 +131,7 @@ Thumbs.db
 
 # AWS
 .aws/
+
+instructions.md
+env.dev
+supabase-schema.sql

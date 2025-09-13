@@ -1,12 +1,26 @@
 service: lingobuddy-backend
 
-frameworkVersion: '3'
+plugins:
+  - serverless-dotenv-plugin
+
+custom:
+  dotenv:
+    path: ./.env.${opt:stage, 'dev'}
+  allowedOrigins:
+    dev: http://localhost:3000
+    local: http://localhost:3000
 
 provider:
   name: aws
   runtime: nodejs18.x
-  region: us-east-1
   stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  logs:
+    restApi:
+      accessLogging: true
+      executionLogging: true
+      level: INFO
+      fullExecutionData: true
   environment:
     SUPABASE_URL: ${env:SUPABASE_URL}
     SUPABASE_ANON_KEY: ${env:SUPABASE_ANON_KEY}
@@ -14,6 +28,9 @@ provider:
     DEEPGRAM_API_KEY: ${env:DEEPGRAM_API_KEY}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY}
+    OPENAI_MODEL: ${env:OPENAI_MODEL, 'gpt-3.5-turbo'}
+    ELEVENLABS_VOICE_ID: ${env:ELEVENLABS_VOICE_ID, 'pNInz6obpgDQGcFmaJgB'}
+    ALLOWED_ORIGINS: ${self:custom.allowedOrigins.${self:provider.stage}}
   iam:
     role:
       statements:
@@ -22,7 +39,10 @@ provider:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-          Resource: '*'
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
+          Resource: 
+            - 'arn:aws:logs:${self:provider.region}:${aws:accountId}:*'
 
 functions:
   # Authentication
@@ -30,82 +50,135 @@ functions:
     handler: src/handlers/auth.signup
     events:
       - http:
-          path: auth/signup
+          path: /auth/signup
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
 
   login:
     handler: src/handlers/auth.login
     events:
       - http:
-          path: auth/login
+          path: /auth/login
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
 
   # Conversations
   createConversation:
     handler: src/handlers/conversations.create
     events:
       - http:
-          path: conversations
+          path: /conversations
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
 
   getConversations:
     handler: src/handlers/conversations.list
     events:
       - http:
-          path: conversations
+          path: /conversations
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
 
   getConversation:
     handler: src/handlers/conversations.get
     events:
       - http:
-          path: conversations/{id}
+          path: /conversations/{id}
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
 
   deleteConversation:
     handler: src/handlers/conversations.deleteConversationHandler
     events:
       - http:
-          path: conversations/{id}
+          path: /conversations/{id}
           method: delete
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
 
   # Speech Processing
   transcribeSpeech:
     handler: src/handlers/speech.transcribe
     events:
       - http:
-          path: speech/transcribe
+          path: /speech/transcribe
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
+    timeout: 30
 
   generateResponse:
     handler: src/handlers/speech.generateResponse
     events:
       - http:
-          path: speech/generate-response
+          path: /speech/generate-response
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
+    timeout: 60
 
   # Languages
   getLanguages:
     handler: src/handlers/languages.list
     events:
       - http:
-          path: languages
+          path: /languages
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+            allowCredentials: false
 
-plugins:
-  - serverless-plugin-typescript
-
-package:
-  patterns:
-    - '!node_modules/.cache/**'
-    - '!.git/**'
-    - '!.env*'
+outputs:
+  Region:
+    Value: ${self:provider.region}
+    Description: AWS Region
+  ServiceEndpoint:
+    Description: URL of the service
+    Value:
+      Fn::Join:
+        - ''
+        - - https://
+          - Ref: ApiGatewayRestApi
+          - .execute-api.
+          - ${self:provider.region}
+          - .amazonaws.com/
+          - ${self:provider.stage}
