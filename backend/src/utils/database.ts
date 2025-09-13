@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { User, Conversation, Interaction } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
@@ -7,36 +8,32 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // User operations
-export async function createUser(email: string, password: string): Promise<User> {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
+export async function createUser(username: string, password: string): Promise<User> {
+  try {
+    const {data, error} = await supabase.from('users').insert({
+      id: uuidv4(),
+      created_at: new Date().toISOString(),
+      username,
+      password,
+    }).select().single();
 
-  if (error) throw error;
-  if (!data.user) throw new Error('Failed to create user');
-
-  return {
-    id: data.user.id,
-    email: data.user.email!,
-    created_at: data.user.created_at,
-  };
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Create user error:', error);
+    throw error;
+  }
 }
 
-export async function authenticateUser(email: string, password: string): Promise<User> {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) throw error;
-  if (!data.user) throw new Error('Authentication failed');
-
-  return {
-    id: data.user.id,
-    email: data.user.email!,
-    created_at: data.user.created_at,
-  };
+export async function getUserInfo(username: string): Promise<User> {
+  try {
+    const {data, error} = await supabase.from('users').select('*').eq('username', username).single();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Authenticate user error:', error);
+    throw error;
+  }
 }
 
 // Conversation operations

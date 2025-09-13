@@ -1,6 +1,7 @@
 export interface User {
   id: string;
-  email: string;
+  username: string;
+  password: string;
   created_at: string;
 }
 
@@ -63,11 +64,39 @@ export interface CreateConversationRequest {
 }
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
 }
 
 export interface SignupRequest {
-  email: string;
+  username: string;
   password: string;
+}
+
+export interface TranslateWordRequest {
+  word: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+export interface TranslateWordResponse {
+  originalWord: string;
+  translatedWord: string;
+  partOfSpeech?: string;
+  confidence?: number;
+}
+
+export interface SplitAndTranslateRequest {
+  text: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+}
+
+export interface SplitAndTranslateResponse {
+  segments: Array<{
+    text: string;
+    translation: string;
+    hoverable: boolean;
+    partOfSpeech?: string;
+  }>;
 }

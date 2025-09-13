@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* LingoBuddy Brand Colors */
+    --background: 218 50% 98%;
+    --foreground: 220 15% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 20%;
+
+    /* Blue Language Learning Theme */
+    --primary: 212 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 212 45% 88%;
+    --primary-glow: 212 85% 75%;
+
+    --secondary: 210 30% 96%;
+    --secondary-foreground: 220 15% 25%;
+
+    --muted: 210 30% 96%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 165 85% 60%;
+    --accent-foreground: 0 0% 100%;
+    --accent-soft: 165 45% 88%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 215 25% 92%;
+    --input: 215 25% 92%;
+    --ring: 212 85% 60%;
+
+    /* Chat Interface */
+    --user-message: 212 85% 60%;
+    --ai-message: 215 25% 95%;
+    --hover-accent: 212 45% 95%;
+
+    /* Voice Recording */
+    --recording-pulse: 0 85% 65%;
+    --recording-bg: 0 45% 95%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(212 85% 60%), hsl(212 85% 70%));
+    --gradient-hero: linear-gradient(135deg, hsl(212 85% 55%) 0%, hsl(165 85% 60%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(210 30% 98%) 100%);
+
+    /* Shadows */
+    --shadow-soft: 0 4px 20px hsl(212 85% 60% / 0.1);
+    --shadow-medium: 0 8px 30px hsl(212 85% 60% / 0.15);
+    --shadow-glow: 0 0 30px hsl(212 85% 60% / 0.3);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 212 85% 65%;
+    --primary-foreground: 220 25% 8%;
+    --primary-soft: 212 25% 25%;
+    --primary-glow: 212 85% 70%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 210 40% 95%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 165 85% 65%;
+    --accent-foreground: 220 25% 8%;
+    --accent-soft: 165 25% 25%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 212 85% 65%;
+
+    --user-message: 212 85% 65%;
+    --ai-message: 220 15% 18%;
+    --hover-accent: 212 25% 25%;
+
+    --recording-pulse: 0 85% 70%;
+    --recording-bg: 0 25% 25%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(212 85% 60%), hsl(212 85% 70%));
+    --gradient-hero: linear-gradient(135deg, hsl(212 85% 55%) 0%, hsl(165 85% 60%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(220 20% 12%) 0%, hsl(220 15% 15%) 100%);
+
+    --shadow-soft: 0 4px 20px hsl(0 0% 0% / 0.2);
+    --shadow-medium: 0 8px 30px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 30px hsl(212 85% 60% / 0.4);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/50;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  /* Pulse animation for recording */
+  .pulse-record {
+    animation: pulse-record 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-record {
+    0%, 100% { 
+      transform: scale(1);
+      box-shadow: 0 0 0 0 hsl(var(--recording-pulse) / 0.4);
+    }
+    50% { 
+      transform: scale(1.05);
+      box-shadow: 0 0 0 20px hsl(var(--recording-pulse) / 0);
+    }
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass effect */
+  .glass-effect {
+    backdrop-filter: blur(8px);
+    background: hsl(var(--background) / 0.8);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+}

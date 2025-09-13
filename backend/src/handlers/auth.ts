@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { createUser, authenticateUser } from '../utils/database';
+import { createUser, getUserInfo } from '../utils/database';
 import { success, badRequest, error, unauthorized } from '../utils/response';
 import { SignupRequest, LoginRequest } from '../types';
 
@@ -11,11 +11,11 @@ export const signup = async (event: APIGatewayProxyEvent): Promise<APIGatewayPro
 
     const body: SignupRequest = JSON.parse(event.body);
     
-    if (!body.email || !body.password) {
-      return badRequest('Email and password are required');
+    if (!body.username || !body.password) {
+      return badRequest('username and password are required');
     }
 
-    const user = await createUser(body.email, body.password);
+    const user = await createUser(body.username, body.password);
     return success(user, 201);
   } catch (error: any) {
     console.error('Signup error:', error);
@@ -31,14 +31,22 @@ export const login = async (event: APIGatewayProxyEvent): Promise<APIGatewayProx
 
     const body: LoginRequest = JSON.parse(event.body);
     
-    if (!body.email || !body.password) {
-      return badRequest('Email and password are required');
+    if (!body.username || !body.password) {
+      return badRequest('username and password are required');
     }
 
-    const user = await authenticateUser(body.email, body.password);
+    const user = await getUserInfo(body.username);
+    if (!user) {
+      return badRequest('Invalid username');
+    }
+
+    if (user.password !== body.password) {
+      return badRequest('Invalid Password');
+    }
+
     return success(user);
   } catch (error: any) {
     console.error('Login error:', error);
-    return unauthorized('Invalid credentials');
+    return error(error.message || 'Failed to login', 400);
   }
 };

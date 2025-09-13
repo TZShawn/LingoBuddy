@@ -3,15 +3,11 @@ service: lingobuddy
 plugins:
   - serverless-dotenv-plugin
 
-custom:
-  dotenv:
-    path: ./.env
-
 provider:
   name: aws
   runtime: nodejs18.x
-  stage: dev
-  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
   logs:
     restApi:
       accessLogging: true
@@ -163,6 +159,37 @@ functions:
             headers:
               - Content-Type
             allowCredentials: false
+
+  # Translation
+  translateWord:
+    handler: src/handlers/translate.translateWordHandler
+    events:
+      - http:
+          path: /translate/word
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
+
+  splitAndTranslate:
+    handler: src/handlers/split-translate.splitAndTranslateHandler
+    events:
+      - http:
+          path: /translate/split-text
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-User-Id
+            allowCredentials: false
+
+custom:
+  dotenv:
+    path: ./.env
 
 outputs:
   Region:
