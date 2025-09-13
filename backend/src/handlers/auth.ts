@@ -15,10 +15,6 @@ export const signup = async (event: APIGatewayProxyEvent): Promise<APIGatewayPro
       return badRequest('Email and password are required');
     }
 
-    if (body.password.length < 6) {
-      return badRequest('Password must be at least 6 characters');
-    }
-
     const user = await createUser(body.email, body.password);
     return success(user, 201);
   } catch (error: any) {

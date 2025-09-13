@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { getConversation, createInteraction, updateInteraction, getConversationInteractions } from '../utils/database';
 import { success, badRequest, error, notFound } from '../utils/response';
-import { transcribeAudio, generateResponse, textToSpeech } from '../utils/apis';
+import { transcribeAudio, chatGenerateResponse, textToSpeech } from '../utils/apis';
 import { TranscribeRequest, GenerateResponseRequest } from '../types';
 
 // Helper function to get user ID from headers
@@ -77,7 +77,7 @@ export const generateResponse = async (event: APIGatewayProxyEvent): Promise<API
       .flat();
 
     // Generate AI response using OpenAI
-    const aiResponse = await generateResponse(
+    const aiResponse = await chatGenerateResponse(
       body.text,
       conversation.language,
       conversationHistory

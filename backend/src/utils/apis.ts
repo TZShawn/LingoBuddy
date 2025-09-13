@@ -32,7 +32,7 @@ export async function transcribeAudio(audioBase64: string, language: string): Pr
 }
 
 // OpenAI API
-export async function generateResponse(
+export async function chatGenerateResponse(
   userMessage: string,
   language: string,
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []

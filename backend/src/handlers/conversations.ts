@@ -2,6 +2,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { createConversation, getConversations, getConversation, deleteConversation, getConversationInteractions } from '../utils/database';
 import { success, badRequest, error, notFound } from '../utils/response';
 import { CreateConversationRequest } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 // Helper function to get user ID from headers (you might want to implement JWT validation)
 const getUserId = (event: APIGatewayProxyEvent): string => {
@@ -27,9 +28,12 @@ export const create = async (event: APIGatewayProxyEvent): Promise<APIGatewayPro
 
     const userId = getUserId(event);
     const conversation = await createConversation(
+      uuidv4(),
       userId,
       body.language,
-      body.title
+      body.title,
+      new Date().toISOString(),
+      new Date().toISOString()
     );
 
     return success(conversation, 201);

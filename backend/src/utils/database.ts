@@ -41,16 +41,20 @@ export async function authenticateUser(email: string, password: string): Promise
 
 // Conversation operations
 export async function createConversation(
+  id: string,
   userId: string,
   language: string,
-  title?: string
+  title?: string,
+  created_at?: string,
+  updated_at?: string
 ): Promise<Conversation> {
   const conversationData = {
+    id,
     user_id: userId,
     language,
     title: title || `Conversation in ${language}`,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: created_at || new Date().toISOString(),
+    updated_at: updated_at ||   new Date().toISOString(),
   };
 
   const { data, error } = await supabase
