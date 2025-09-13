@@ -1,20 +1,17 @@
-service: lingobuddy-backend
+service: lingobuddy
 
 plugins:
   - serverless-dotenv-plugin
 
 custom:
   dotenv:
-    path: ./.env.${opt:stage, 'dev'}
-  allowedOrigins:
-    dev: http://localhost:3000
-    local: http://localhost:3000
+    path: ./.env
 
 provider:
   name: aws
   runtime: nodejs18.x
-  stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'us-east-1'}
+  stage: dev
+  region: us-east-1
   logs:
     restApi:
       accessLogging: true
@@ -30,7 +27,7 @@ provider:
     ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY}
     OPENAI_MODEL: ${env:OPENAI_MODEL, 'gpt-3.5-turbo'}
     ELEVENLABS_VOICE_ID: ${env:ELEVENLABS_VOICE_ID, 'pNInz6obpgDQGcFmaJgB'}
-    ALLOWED_ORIGINS: ${self:custom.allowedOrigins.${self:provider.stage}}
+    ALLOWED_ORIGINS: '*'
   iam:
     role:
       statements:
