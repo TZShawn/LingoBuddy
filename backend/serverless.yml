@@ -2,6 +2,9 @@ service: lingobuddy
 
 plugins:
   - serverless-dotenv-plugin
+allowedOrigins:
+  - '*'
+
 
 provider:
   name: aws
@@ -23,7 +26,7 @@ provider:
     ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY}
     OPENAI_MODEL: ${env:OPENAI_MODEL, 'gpt-3.5-turbo'}
     ELEVENLABS_VOICE_ID: ${env:ELEVENLABS_VOICE_ID, 'pNInz6obpgDQGcFmaJgB'}
-    ALLOWED_ORIGINS: '*'
+    ALLOWED_ORIGINS: ${allowedOrigins}
   iam:
     role:
       statements:
@@ -49,7 +52,6 @@ functions:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
 
   login:
@@ -62,7 +64,6 @@ functions:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
 
   # Conversations
@@ -76,21 +77,35 @@ functions:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
 
-  getConversations:
-    handler: src/handlers/conversations.list
+  createConversationOptions:
+    handler: src/handlers/cors.handleCors
     events:
       - http:
           path: /conversations
+          method: options
+          cors: true
+
+  getAllConversations:
+    handler: src/handlers/conversations.list
+    events:
+      - http:
+          path: /allconversations/{userId}
           method: get
           cors:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
+
+  getAllConversationsOptions:
+    handler: src/handlers/cors.handleCors
+    events:
+      - http:
+          path: /allconversations/{userId}
+          method: options
+          cors: true
 
   getConversation:
     handler: src/handlers/conversations.get
@@ -102,20 +117,26 @@ functions:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
+
+  getConversationOptions:
+    handler: src/handlers/cors.handleCors
+    events:
+      - http:
+          path: /conversations/{id}
+          method: options
+          cors: true
 
   deleteConversation:
     handler: src/handlers/conversations.deleteConversationHandler
     events:
       - http:
           path: /conversations/{id}
-          method: delete
+          method: post
           cors:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
 
   # Speech Processing
@@ -133,6 +154,14 @@ functions:
             allowCredentials: false
     timeout: 30
 
+  transcribeSpeechOptions:
+    handler: src/handlers/cors.handleCors
+    events:
+      - http:
+          path: /speech/transcribe
+          method: options
+          cors: true
+
   generateResponse:
     handler: src/handlers/speech.generateResponse
     events:
@@ -146,6 +175,14 @@ functions:
               - X-User-Id
             allowCredentials: false
     timeout: 60
+
+  generateResponseOptions:
+    handler: src/handlers/cors.handleCors
+    events:
+      - http:
+          path: /speech/generate-response
+          method: options
+          cors: true
 
   # Languages
   getLanguages:
@@ -171,7 +208,6 @@ functions:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
 
   splitAndTranslate:
@@ -184,7 +220,6 @@ functions:
             origin: '*'
             headers:
               - Content-Type
-              - X-User-Id
             allowCredentials: false
 
 custom:

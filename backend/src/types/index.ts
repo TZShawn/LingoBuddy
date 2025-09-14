@@ -17,8 +17,8 @@ export interface Conversation {
 export interface Interaction {
   id: string;
   conversation_id: string;
-  user_message: string;
-  ai_response: string;
+  message: string;
+  sender: 'user' | 'ai';
   created_at: string;
 }
 
@@ -39,6 +39,7 @@ export interface TranscribeRequest {
   audioFile: string; // base64 encoded audio
   conversationId: string;
   language: string;
+  userId?: string;
 }
 
 export interface TranscribeResponse {
@@ -59,6 +60,7 @@ export interface GenerateResponseResponse {
 }
 
 export interface CreateConversationRequest {
+  userId: string;
   language: string;
   title?: string;
 }

@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Mic, MicOff, Play, Pause, Volume2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Mic, MicOff, Play, Pause, Volume2, Settings, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,8 +23,8 @@ interface Conversation {
 interface Interaction {
   id: string;
   conversation_id: string;
-  user_message: string;
-  ai_response: string;
+  message: string;
+  sender: 'user' | 'ai';
   created_at: string;
 }
 
@@ -33,6 +34,14 @@ interface Message {
   content: string;
   timestamp: Date;
   audioUrl?: string;
+  translated?: boolean;
+  translationData?: Array<{
+    text: string;
+    translation: string;
+    hoverable: boolean;
+    partOfSpeech?: string;
+  }>;
+  fullTranslation?: string;
 }
 
 interface WordTranslation {
@@ -55,7 +64,16 @@ const mockTranslations: { [key: string]: string } = {
   'merci': 'thank you'
 };
 
-const HoverableText: React.FC<{ text: string; language: string }> = ({ text, language }) => {
+const HoverableText: React.FC<{ 
+  text: string; 
+  language: string; 
+  translationData?: Array<{
+    text: string;
+    translation: string;
+    hoverable: boolean;
+    partOfSpeech?: string;
+  }>;
+}> = ({ text, language, translationData }) => {
   const [hoveredWord, setHoveredWord] = useState<string | null>(null);
   const [translations, setTranslations] = useState<{ [key: string]: WordTranslation }>({});
   const { toast } = useToast();
@@ -102,8 +120,133 @@ const HoverableText: React.FC<{ text: string; language: string }> = ({ text, lan
     }
   };
 
-  const words = text.split(/(\s+)/);
+  // If we have translation data, use it; otherwise fall back to the old method
+  if (translationData && translationData.length > 0) {
+    console.log('HoverableText with translation data:', translationData);
+    
+    // For languages with translation data, we need to match segments to text positions
+    const isChineseOrJapanese = /[\u4e00-\u9fff\u3400-\u4dbf\u3040-\u309f\u30a0-\u30ff]/.test(text);
+    
+    if (isChineseOrJapanese) {
+      // For Chinese/Japanese, we need to match segments to the text by position
+      // since segments might be multi-character words
+      let currentIndex = 0;
+      const elements: JSX.Element[] = [];
+      
+      for (let i = 0; i < translationData.length; i++) {
+        const segment = translationData[i];
+        const segmentText = segment.text;
+        const segmentStart = text.indexOf(segmentText, currentIndex);
+        
+        if (segmentStart === -1) {
+          // If we can't find the segment, add it as plain text
+          elements.push(<span key={`segment-${i}`}>{segmentText}</span>);
+          currentIndex += segmentText.length;
+        } else {
+          // Add any text before this segment
+          if (segmentStart > currentIndex) {
+            const beforeText = text.slice(currentIndex, segmentStart);
+            elements.push(<span key={`before-${i}`}>{beforeText}</span>);
+          }
+          
+          // Add the segment with translation if hoverable
+          if (segment.hoverable) {
+            elements.push(
+              <Tooltip key={`segment-${i}`}>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      "cursor-pointer transition-colors duration-200 hover:bg-chat-hover hover:text-primary rounded-sm px-0.5",
+                      hoveredWord === segmentText && "bg-chat-hover text-primary"
+                    )}
+                    onMouseEnter={() => setHoveredWord(segmentText)}
+                    onMouseLeave={() => setHoveredWord(null)}
+                  >
+                    {segmentText}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-center">
+                    <div>
+                      <strong>{segment.text}</strong> → {segment.translation}
+                      {segment.partOfSpeech && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {segment.partOfSpeech}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          } else {
+            elements.push(<span key={`segment-${i}`}>{segmentText}</span>);
+          }
+          
+          currentIndex = segmentStart + segmentText.length;
+        }
+      }
+      
+      // Add any remaining text
+      if (currentIndex < text.length) {
+        const remainingText = text.slice(currentIndex);
+        elements.push(<span key="remaining">{remainingText}</span>);
+      }
+      
+      return <span>{elements}</span>;
+    } else {
+      // For languages with spaces, split by words
+      const words = text.split(/(\s+)/).filter(word => word.trim() !== '');
+      
+      return (
+        <span>
+          {words.map((word, index) => {
+            // Find the corresponding translation data
+            const translation = translationData.find(t => 
+              t.text === word || t.text === word.replace(/[.,!?;]/g, '')
+            );
 
+            if (!translation || !translation.hoverable) {
+              return <span key={index}>{word}</span>;
+            }
+
+            return (
+              <Tooltip key={index}>
+                <TooltipTrigger asChild>
+                  <span
+                  className={cn(
+                    "cursor-pointer transition-colors duration-200 hover:bg-chat-hover hover:text-primary rounded-sm px-0.5",
+                    hoveredWord === word && "bg-chat-hover text-primary"
+                  )}
+                  onMouseEnter={() => setHoveredWord(word)}
+                  onMouseLeave={() => setHoveredWord(null)}
+                >
+                  {word}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-center">
+                  <div>
+                    <strong>{translation.text}</strong> → {translation.translation}
+                    {translation.partOfSpeech && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {translation.partOfSpeech}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </span>
+    );
+    }
+  }
+
+  // Fallback to old method for backward compatibility
+  const words = text.split(/(\s+)/);
+  
   return (
     <span>
       {words.map((word, index) => {
@@ -151,11 +294,25 @@ const HoverableText: React.FC<{ text: string; language: string }> = ({ text, lan
   );
 };
 
+// Language code to name mapping
+const codeToLanguage = {
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'it': 'Italian',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'zh': 'Mandarin (simplified)',
+}
+
 const Conversation = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const language = searchParams.get('language') || 'Spanish';
+  const language = searchParams.get('language') || 'English';
   const { toast } = useToast();
   
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -165,6 +322,10 @@ const Conversation = () => {
   const [recordingStatus, setRecordingStatus] = useState<'ready' | 'recording' | 'processing'>('ready');
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [availableMics, setAvailableMics] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicId, setSelectedMicId] = useState<string>('');
+  const [currentMic, setCurrentMic] = useState<string>('');
+  const [translatingMessage, setTranslatingMessage] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -173,6 +334,38 @@ const Conversation = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Load available microphones
+  useEffect(() => {
+    const loadMicrophones = async () => {
+      try {
+        // Request permission first
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Get available devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        
+        console.log('Available microphones:', audioInputs);
+        setAvailableMics(audioInputs);
+        
+        // Set default microphone
+        if (audioInputs.length > 0) {
+          setSelectedMicId(audioInputs[0].deviceId);
+          setCurrentMic(audioInputs[0].label || 'Default Microphone');
+        }
+      } catch (error) {
+        console.error('Error loading microphones:', error);
+        toast({
+          title: "Error",
+          description: "Failed to access microphone devices",
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadMicrophones();
+  }, [toast]);
 
   useEffect(() => {
     const loadConversation = async () => {
@@ -184,8 +377,10 @@ const Conversation = () => {
         const savedUser = localStorage.getItem('lingobuddy_user');
         const userId = savedUser ? JSON.parse(savedUser).id : null;
         
+        console.log(id)
+
         const response = await fetch(`${API_BASE_URL}/conversations/${id}`, {
-          headers: { 'X-User-Id': userId }
+          headers: { 'Content-Type': 'application/json' }
         });
         
         const data = await response.json();
@@ -201,38 +396,18 @@ const Conversation = () => {
         const messageList: Message[] = [];
         if (conversationData.interactions) {
           conversationData.interactions.forEach((interaction: Interaction) => {
-            if (interaction.user_message) {
-              messageList.push({
-                id: `user-${interaction.id}`,
-                type: 'user',
-                content: interaction.user_message,
-                timestamp: new Date(interaction.created_at)
-              });
-            }
-            if (interaction.ai_response) {
-              messageList.push({
-                id: `ai-${interaction.id}`,
-                type: 'ai',
-                content: interaction.ai_response,
-                timestamp: new Date(interaction.created_at),
-                audioUrl: '/mock-audio.mp3' // Will be replaced with real audio
-              });
-            }
+            messageList.push({
+              id: interaction.id,
+              type: interaction.sender,
+              content: interaction.message,
+              timestamp: new Date(interaction.created_at),
+              audioUrl: interaction.sender === 'ai' ? '/mock-audio.mp3' : undefined // Will be replaced with real audio
+            });
           });
         }
         
-        // If no interactions, add welcome message
-        if (messageList.length === 0) {
-          messageList.push({
-            id: 'welcome',
-            type: 'ai',
-            content: language === 'Spanish' ? '¡Hola! ¿Cómo estás hoy?' : 
-                     language === 'French' ? 'Bonjour! Comment allez-vous aujourd\'hui?' :
-                     'Hello! How are you today?',
-            timestamp: new Date(),
-            audioUrl: '/mock-audio.mp3'
-          });
-        }
+        // If no interactions, don't add any welcome message
+        // The chat will be empty and clean
         
         setMessages(messageList);
       } catch (error) {
@@ -251,44 +426,129 @@ const Conversation = () => {
     loadConversation();
   }, [id, language, navigate, toast]);
 
-  const handleStartRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+  const handleToggleRecording = async () => {
+    if (isRecording) {
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+        setRecordingStatus('processing');
+        setIsProcessing(true);
+      }
+    } else {
+      // Start recording
+      try {
+        const audioConstraints: MediaTrackConstraints = {
+          sampleRate: 16000, // Deepgram works better with 16kHz
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        };
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+        // Use selected microphone if available
+        if (selectedMicId) {
+          audioConstraints.deviceId = { exact: selectedMicId };
         }
-      };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        await processAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
+        console.log('Requesting microphone access with constraints:', audioConstraints);
+        console.log('Selected microphone ID:', selectedMicId);
 
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingStatus('recording');
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      toast({
-        title: "Error",
-        description: "Failed to start recording. Please check microphone permissions.",
-        variant: "destructive",
-      });
-    }
-  };
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: audioConstraints
+        });
 
-  const handleStopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setRecordingStatus('processing');
-      setIsProcessing(true);
+        // Get the actual device being used
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          const track = audioTracks[0];
+          const settings = track.getSettings();
+          console.log('Actual microphone settings:', settings);
+          
+          // Find the microphone name from our list
+          const micInfo = availableMics.find(mic => mic.deviceId === settings.deviceId);
+          const micName = micInfo?.label || `Microphone ${settings.deviceId?.slice(0, 8) || 'Unknown'}`;
+          setCurrentMic(micName);
+        }
+        
+        // Check for supported MIME types
+        let mimeType = 'audio/webm;codecs=opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/webm';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/mp4';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'audio/wav';
+            }
+          }
+        }
+        
+        console.log('Using MIME type:', mimeType);
+        
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: mimeType
+        });
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          console.log('Recording stopped, processing audio...');
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+          console.log('Audio blob created:', {
+            size: audioBlob.size,
+            type: audioBlob.type,
+            sizeInMB: (audioBlob.size / (1024 * 1024)).toFixed(2)
+          });
+          
+          
+          // Check if audio is long enough (at least 0.5 seconds)
+          if (audioBlob.size < 1000) {
+            console.warn('Audio too short, might not be transcribed');
+            toast({
+              title: "Warning",
+              description: "Recording too short. Please speak for at least 1 second.",
+              variant: "destructive",
+            });
+            setIsProcessing(false);
+            setRecordingStatus('ready');
+            stream.getTracks().forEach(track => track.stop());
+            return;
+          }
+          
+          await processAudio(audioBlob);
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.onerror = (event) => {
+          console.error('MediaRecorder error:', event);
+          toast({
+            title: "Error",
+            description: "Recording failed. Please try again.",
+            variant: "destructive",
+          });
+          setIsRecording(false);
+          setRecordingStatus('ready');
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start(100); // Collect data every 100ms
+        setIsRecording(true);
+        setRecordingStatus('recording');
+        console.log('Recording started with MIME type:', mimeType);
+      } catch (error) {
+        console.error('Error starting recording:', error);
+        toast({
+          title: "Error",
+          description: "Failed to start recording. Please check microphone permissions.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -296,31 +556,46 @@ const Conversation = () => {
     if (!conversation) return;
 
     try {
+      // Debug audio blob info
+      console.log('Audio blob info:', {
+        size: audioBlob.size,
+        type: audioBlob.type,
+        sizeInMB: (audioBlob.size / (1024 * 1024)).toFixed(2)
+      });
+
       // Convert audio to base64
       const arrayBuffer = await audioBlob.arrayBuffer();
       const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+      console.log('Base64 audio length:', base64Audio.length);
 
       const savedUser = localStorage.getItem('lingobuddy_user');
       const userId = savedUser ? JSON.parse(savedUser).id : null;
 
       // Transcribe audio
+      console.log('Sending transcription request...');
       const transcribeResponse = await fetch(`${API_BASE_URL}/speech/transcribe`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-User-Id': userId
         },
         body: JSON.stringify({
           audioFile: base64Audio,
           conversationId: conversation.id,
-          language: conversation.language
+          language: conversation.language,
+          userId: userId
         })
       });
 
       const transcribeData = await transcribeResponse.json();
+      console.log('Transcription response:', transcribeData);
       
       if (!transcribeData.success) {
-        throw new Error(transcribeData.error);
+        throw new Error(transcribeData.error || 'Transcription failed');
+      }
+
+      if (!transcribeData.data?.text || transcribeData.data.text.trim() === '') {
+        throw new Error('No speech detected. Please try speaking louder or closer to the microphone.');
       }
 
       // Add user message
@@ -333,11 +608,11 @@ const Conversation = () => {
       setMessages(prev => [...prev, userMessage]);
 
       // Generate AI response
+      console.log('Generating AI response...');
       const generateResponse = await fetch(`${API_BASE_URL}/speech/generate-response`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-User-Id': userId
         },
         body: JSON.stringify({
           text: transcribeData.data.text,
@@ -347,9 +622,12 @@ const Conversation = () => {
       });
 
       const generateData = await generateResponse.json();
+
+
+      console.log('Generate response:', generateData);
       
       if (!generateData.success) {
-        throw new Error(generateData.error);
+        throw new Error(generateData.error || 'Failed to generate response');
       }
 
       // Add AI response
@@ -362,11 +640,18 @@ const Conversation = () => {
       };
       setMessages(prev => [...prev, aiMessage]);
 
-    } catch (error) {
+      // Auto-play the AI response audio
+      if (generateData.data.audioFile) {
+        setTimeout(() => {
+          handlePlayAudio(aiMessage.id, generateData.data.audioFile);
+        }, 500); // Small delay to ensure the message is rendered
+      }
+
+    } catch (error: any) {
       console.error('Error processing audio:', error);
       toast({
         title: "Error",
-        description: "Failed to process audio. Please try again.",
+        description: error.message || "Failed to process audio. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -399,29 +684,94 @@ const Conversation = () => {
       audio.onerror = () => {
         setPlayingAudio(null);
         URL.revokeObjectURL(audioUrl_obj);
-        toast({
-          title: "Error",
-          description: "Failed to play audio",
-          variant: "destructive",
-        });
+        console.warn('Failed to play audio for message:', messageId);
+        // Don't show toast for auto-play failures to avoid spam
       };
       
       await audio.play();
     } catch (error) {
       console.error('Error playing audio:', error);
       setPlayingAudio(null);
-      toast({
-        title: "Error",
-        description: "Failed to play audio",
-        variant: "destructive",
-      });
+      // Don't show toast for auto-play failures to avoid spam
     }
   };
 
+  const handleTranslateMessage = async (messageId: string, text: string) => {
+    if (!conversation) return;
+
+    try {
+      setTranslatingMessage(messageId);
+      
+      // Convert language name to code for the API
+      const languageCodeMap: { [key: string]: string } = {
+        'English': 'en',
+        'Spanish': 'es', 
+        'French': 'fr',
+        'German': 'de',
+        'Italian': 'it',
+        'Portuguese': 'pt',
+        'Russian': 'ru',
+        'Japanese': 'ja',
+        'Korean': 'ko',
+        'Chinese': 'zh',
+        'Mandarin (simplified)': 'zh'
+      };
+      
+      const sourceLanguageCode = languageCodeMap[conversation.language] || conversation.language;
+      
+      const response = await fetch(`${API_BASE_URL}/translate/split-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text,
+          sourceLanguage: sourceLanguageCode,
+          targetLanguage: 'en'
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Translation failed');
+      }
+
+      // Update the message with translation data
+      console.log('Translation API response:', data);
+      console.log('Translation segments:', data.data.segments);
+      console.log('Full translation:', data.data.textTranslation);
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { 
+              ...msg, 
+              translated: true, 
+              translationData: data.data.segments,
+              fullTranslation: data.data.textTranslation
+            }
+          : msg
+      ));
+
+      toast({
+        title: "Translation Complete",
+        description: "Hover over words to see translations",
+      });
+    } catch (error: any) {
+      console.error('Translation error:', error);
+      toast({
+        title: "Translation Error",
+        description: error.message || "Failed to translate message",
+        variant: "destructive",
+      });
+    } finally {
+      setTranslatingMessage(null);
+    }
+  };
+
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-primary-soft/5 to-accent-soft/5 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-background via-primary-soft/5 to-accent-soft/5 flex flex-col">
       {/* Header */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm flex-shrink-0">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -436,7 +786,7 @@ const Conversation = () => {
               </Button>
               <div className="flex items-center gap-3">
                 <Badge className="bg-gradient-primary text-primary-foreground">
-                  {conversation?.language || language}
+                  {codeToLanguage[conversation?.language as keyof typeof codeToLanguage] || conversation?.language || language}
                 </Badge>
                 <h1 className="text-lg font-semibold">Conversation Practice</h1>
               </div>
@@ -449,8 +799,8 @@ const Conversation = () => {
         </div>
       </header>
 
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Chat Messages - Scrollable Container */}
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         <div className="container mx-auto max-w-3xl space-y-4">
           {loading ? (
             <div className="flex justify-center py-12">
@@ -476,27 +826,56 @@ const Conversation = () => {
                     {message.type === 'user' ? (
                       message.content
                     ) : (
-                      <HoverableText text={message.content} language={language} />
+                      <HoverableText 
+                        text={message.content} 
+                        language={language} 
+                        translationData={message.translationData}
+                      />
                     )}
                   </div>
                   
+                  {/* Full translation display */}
+                  {message.type === 'ai' && message.translated && message.fullTranslation && (
+                    <div className="mt-2 p-2 bg-muted/50 rounded-md border-l-2 border-primary/30">
+                      <div className="text-xs text-muted-foreground mb-1">Full Translation:</div>
+                      <div className="text-sm text-foreground">{message.fullTranslation}</div>
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-between text-xs opacity-70">
                     <span>{message.timestamp.toLocaleTimeString()}</span>
-                    {message.type === 'ai' && message.audioUrl && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePlayAudio(message.id, message.audioUrl)}
-                        className="h-6 px-2 gap-1 hover:bg-muted"
-                      >
-                        {playingAudio === message.id ? (
-                          <Pause className="w-3 h-3" />
-                        ) : (
-                          <Play className="w-3 h-3" />
-                        )}
-                        <Volume2 className="w-3 h-3" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {message.type === 'ai' && !message.translated && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleTranslateMessage(message.id, message.content)}
+                          disabled={translatingMessage === message.id}
+                          className="h-6 px-2 gap-1 hover:bg-muted"
+                        >
+                          {translatingMessage === message.id ? (
+                            <div className="animate-spin rounded-full h-3 w-3 border-b border-primary"></div>
+                          ) : (
+                            <Languages className="w-3 h-3" />
+                          )}
+                        </Button>
+                      )}
+                      {message.type === 'ai' && message.audioUrl && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handlePlayAudio(message.id, message.audioUrl)}
+                          className="h-6 px-2 gap-1 hover:bg-muted"
+                        >
+                          {playingAudio === message.id ? (
+                            <Pause className="w-3 h-3" />
+                          ) : (
+                            <Play className="w-3 h-3" />
+                          )}
+                          <Volume2 className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -519,27 +898,48 @@ const Conversation = () => {
         </div>
       </div>
 
-      {/* Recording Interface */}
-      <div className="border-t border-border/50 bg-card/50 backdrop-blur-sm p-4">
+      {/* Recording Interface - Fixed at Bottom */}
+      <div className="border-t border-border/50 bg-card/50 backdrop-blur-sm p-4 flex-shrink-0">
         <div className="container mx-auto max-w-3xl">
           <div className="flex flex-col items-center space-y-4">
             <div className="text-center">
               <p className="text-sm font-medium">
-                {recordingStatus === 'ready' && 'Hold to record your response'}
-                {recordingStatus === 'recording' && 'Recording... Release to stop'}
+                {recordingStatus === 'ready' && 'Click to start recording'}
+                {recordingStatus === 'recording' && 'Recording... Click to stop'}
                 {recordingStatus === 'processing' && 'Processing your speech...'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Speak naturally in {conversation?.language || language}
               </p>
+              
+              {/* Microphone Selector */}
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                <Select value={selectedMicId} onValueChange={setSelectedMicId}>
+                  <SelectTrigger className="w-64 h-8 text-xs">
+                    <SelectValue placeholder="Select microphone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMics.map((mic) => (
+                      <SelectItem key={mic.deviceId} value={mic.deviceId}>
+                        {mic.label || `Microphone ${mic.deviceId.slice(0, 8)}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Current microphone info */}
+              {currentMic && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Using: {currentMic}
+                </p>
+              )}
             </div>
 
             <Button
               size="lg"
-              onMouseDown={handleStartRecording}
-              onMouseUp={handleStopRecording}
-              onTouchStart={handleStartRecording}
-              onTouchEnd={handleStopRecording}
+              onClick={handleToggleRecording}
               disabled={isProcessing}
               variant="gradient"
               className={cn(
@@ -555,6 +955,7 @@ const Conversation = () => {
                 <Mic className="w-8 h-8 text-primary-foreground" />
               )}
             </Button>
+
           </div>
         </div>
       </div>

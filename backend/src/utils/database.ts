@@ -5,6 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
 
+// Validate environment variables
+if (!supabaseUrl) {
+  throw new Error('SUPABASE_URL environment variable is not set');
+}
+if (!supabaseKey) {
+  throw new Error('SUPABASE_SERVICE_KEY environment variable is not set');
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // User operations
@@ -43,7 +51,6 @@ export async function createConversation(
   language: string,
   title?: string,
   created_at?: string,
-  updated_at?: string
 ): Promise<Conversation> {
   const conversationData = {
     id,
@@ -51,7 +58,6 @@ export async function createConversation(
     language,
     title: title || `Conversation in ${language}`,
     created_at: created_at || new Date().toISOString(),
-    updated_at: updated_at ||   new Date().toISOString(),
   };
 
   const { data, error } = await supabase
@@ -69,18 +75,16 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
     .from('conversations')
     .select('*')
     .eq('user_id', userId)
-    .order('updated_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
 }
 
-export async function getConversation(conversationId: string, userId: string): Promise<Conversation> {
+export async function getConversation(conversationId: string): Promise<Conversation> {
   const { data, error } = await supabase
     .from('conversations')
     .select('*')
     .eq('id', conversationId)
-    .eq('user_id', userId)
     .single();
 
   if (error) throw error;
@@ -107,13 +111,13 @@ export async function deleteConversation(conversationId: string, userId: string)
 // Interaction operations
 export async function createInteraction(
   conversationId: string,
-  userMessage: string,
-  aiResponse?: string
+  message: string,
+  sender: 'user' | 'ai'
 ): Promise<Interaction> {
   const interactionData = {
     conversation_id: conversationId,
-    user_message: userMessage,
-    ai_response: aiResponse || '',
+    message: message,
+    sender: sender,
     created_at: new Date().toISOString(),
   };
 
@@ -129,11 +133,11 @@ export async function createInteraction(
 
 export async function updateInteraction(
   interactionId: string,
-  aiResponse: string
+  message: string
 ): Promise<Interaction> {
   const { data, error } = await supabase
     .from('interactions')
-    .update({ ai_response: aiResponse })
+    .update({ message: message })
     .eq('id', interactionId)
     .select()
     .single();

@@ -7,7 +7,7 @@ export function success<T>(data: T, statusCode: number = 200): APIGatewayProxyRe
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-User-Id',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     },
     body: JSON.stringify({
@@ -23,7 +23,7 @@ export function error(message: string, statusCode: number = 400): APIGatewayProx
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-User-Id',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     },
     body: JSON.stringify({
@@ -47,4 +47,20 @@ export function unauthorized(message: string = 'Unauthorized'): APIGatewayProxyR
 
 export function notFound(message: string = 'Resource not found'): APIGatewayProxyResult {
   return error(message, 404);
+}
+
+export function internalServerError(message: string = 'Internal server error'): APIGatewayProxyResult {
+  return {
+    statusCode: 500,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-User-Id',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    },
+    body: JSON.stringify({
+      success: false,
+      error: message,
+    } as ApiResponse),
+  };
 }

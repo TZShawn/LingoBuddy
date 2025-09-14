@@ -12,34 +12,96 @@ const openai = new OpenAI({
 export async function transcribeAudio(audioBase64: string, language: string): Promise<string> {
   const audioBuffer = Buffer.from(audioBase64, 'base64');
   
-  const response = await axios.post(
-    `${DEEPGRAM_API_URL}?model=nova-2&language=${language}&smart_format=true`,
-    audioBuffer,
-    {
-      headers: {
-        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-        'Content-Type': 'audio/wav',
-      },
-    }
-  );
-
-  const transcript = response.data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
-  if (!transcript) {
-    throw new Error('No transcript found in Deepgram response');
+  const languageToVoiceId = {
+    'en': {voiceId: 'cgSgspJ2msm6clMCkdW9', gender: 'female', name: 'Alice'},
+    'es': {voiceId: 'iyvXhCAqzDxKnq3FDjZl', gender: 'female', name: 'Alice'},
+    'fr': {voiceId: 'gaiKXUXMtA8O5fyBjiS9', gender: 'male', name: 'James'},
+    'it': {voiceId: 'b8jhBTcGAq4kQGWmKprT', gender: 'female', name: 'Alice'},
+    'ja': {voiceId: 'PmgfHCGeS5b7sH90BOOJ', gender: 'femmale', name: 'Alice'},
+    'ko': {voiceId: 'AW5wrnG1jVizOYY7R1Oo', gender: 'female', name: 'Alice'},
+    'zh': {voiceId: '4VZIsMPtgggwNg7OXbPY', gender: 'male', name: 'James'},
   }
 
-  return transcript;
+  // Convert language name to language code
+  const languageMap: { [key: string]: string } = {
+    'English': 'en',
+    'Spanish': 'es', 
+    'French': 'fr',
+    'German': 'de',
+    'Italian': 'it',
+    'Portuguese': 'pt',
+    'Russian': 'ru',
+    'Japanese': 'ja',
+    'Korean': 'ko',
+    'Mandarin (simplified)': 'zh'
+  };
+  
+  const languageCode = language
+  
+  console.log('Transcribing audio with language:', language, '->', languageCode);
+  console.log('Audio buffer size:', audioBuffer.length, 'bytes');
+  
+  try {
+    const response = await axios.post(
+      `${DEEPGRAM_API_URL}?model=nova-2&language=${languageCode}&smart_format=true&punctuate=true&utterances=true`,
+      audioBuffer,
+      {
+        headers: {
+          'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+          'Content-Type': 'audio/webm',
+        },
+        timeout: 30000, // 30 second timeout
+      }
+    );
+
+    console.log('Deepgram response:', JSON.stringify(response.data, null, 2));
+
+    // Check if we have results
+    if (!response.data.results) {
+      console.error('No results in Deepgram response:', response.data);
+      throw new Error('No results found in Deepgram response');
+    }
+
+    // Check if we have channels
+    if (!response.data.results.channels || response.data.results.channels.length === 0) {
+      console.error('No channels in Deepgram response:', response.data);
+      throw new Error('No channels found in Deepgram response');
+    }
+
+    // Check if we have alternatives
+    const alternatives = response.data.results.channels[0].alternatives;
+    if (!alternatives || alternatives.length === 0) {
+      console.error('No alternatives in Deepgram response:', response.data);
+      throw new Error('No alternatives found in Deepgram response');
+    }
+
+    const transcript = alternatives[0].transcript;
+    if (!transcript || transcript.trim() === '') {
+      console.error('Empty transcript in Deepgram response:', response.data);
+      throw new Error('No transcript found in Deepgram response');
+    }
+
+    console.log('Successfully transcribed:', transcript);
+    return transcript;
+  } catch (error: any) {
+    console.error('Deepgram API error:', error.response?.data || error.message);
+    throw new Error(`Deepgram transcription failed: ${error.response?.data?.error || error.message}`);
+  }
 }
 
 // OpenAI API
 export async function chatGenerateResponse(
   userMessage: string,
   language: string,
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+  gender: string,
+  name: string
 ): Promise<string> {
-  const systemPrompt = `You are a helpful language learning assistant. The user is practicing ${language}. 
-  Respond naturally in ${language} and help them improve their language skills. 
-  If they make mistakes, gently correct them. Keep responses conversational and encouraging.`;
+  const systemPrompt = `You are a helpful language learning assistant named ${name}. You have the personality of a young adult with gender ${gender} you share very common hobbies and likes as people your age. 
+  The user is practicing ${language} and is still learning the language. 
+  Respond naturally in ${language} you are meant to be someone to talk to not mention you want to help them improve their language skills.
+  You should not have lenghty responses, keep them short and concise.
+  Keep responses conversational and encouraging do not use any other language than ${language}. You are not to imitate a machine, you are to interact like a human would`;
 
   const messages = [
     { role: 'system' as const, content: systemPrompt },
@@ -48,7 +110,7 @@ export async function chatGenerateResponse(
   ];
 
   const response = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+    model: process.env.OPENAI_MODEL || 'gpt-5-nano-2025-08-07',
     messages,
     max_tokens: 200,
     temperature: 0.7,
@@ -64,13 +126,13 @@ export async function chatGenerateResponse(
 
 // 11Labs API
 export async function textToSpeech(text: string, voiceId?: string): Promise<string> {
-  const voice = voiceId || process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
+  const voice = voiceId || process.env.ELEVENLABS_VOICE_ID || 'Xb7hH8YSGvpEDdOyD4ZN'; // Alexandra - young female voice
   
   const response = await axios.post(
     `${ELEVENLABS_API_URL}/${voice}`,
     {
       text,
-      model_id: 'eleven_monolingual_v1',
+      model_id: 'eleven_multilingual_v2', // Best quality for 29 languages including all target languages
       voice_settings: {
         stability: 0.5,
         similarity_boost: 0.5,
@@ -177,12 +239,15 @@ export async function splitAndTranslateText(
     const sourceLangName = languageNames[sourceLanguage as keyof typeof languageNames] || sourceLanguage;
     const targetLangName = languageNames[targetLanguage as keyof typeof languageNames] || targetLanguage;
 
+    console.log('Splitting and translating text:', text, sourceLangName, targetLangName);
+
     const prompt = `Split this ${sourceLangName} text into hoverable segments and translate each meaningful word to ${targetLangName}.
 
 Text: "${text}"
 
 Return ONLY a JSON object with this exact structure:
 {
+  "textTranslation": "whole_text_translation",
   "segments": [
     {
       "text": "original_word",
@@ -194,16 +259,17 @@ Return ONLY a JSON object with this exact structure:
 }
 
 Rules:
-- Only make words hoverable if they have clear meaning
+- You need to make sure you split and translate in a way that people can hover over individual segments and make out what the overall text means. 
+- Make sure you take in the context of the text and split accordingly. For example if two words together have a meaning but separted they mean other stuff you should try to keep them together if the context makes more sense. 
 - Exclude particles, articles, and grammar words (like "が", "です", "the", "a", "an")
 - For languages without spaces (Japanese, Chinese), split into meaningful characters/words
 - For languages with spaces, split by words but exclude grammar words
 - Be accurate with translations and part of speech`;
 
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+      model: process.env.OPENAI_MODEL || 'gpt-5-mini-2025-08-07',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 500,
+      max_tokens: 4096,
       temperature: 0.1,
     });
 
@@ -211,6 +277,8 @@ Rules:
     if (!content) {
       throw new Error('No response generated by OpenAI');
     }
+
+    console.log('Split and translate text response:', content.slice(-300));
 
     const result = JSON.parse(content);
     return result;

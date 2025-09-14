@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { getConversation, createInteraction, updateInteraction, getConversationInteractions } from '../utils/database';
-import { success, badRequest, error, notFound } from '../utils/response';
+import { success, badRequest, error, notFound, internalServerError } from '../utils/response';
 import { transcribeAudio, chatGenerateResponse, textToSpeech } from '../utils/apis';
 import { TranscribeRequest, GenerateResponseRequest } from '../types';
 
@@ -15,26 +15,37 @@ const getUserId = (event: APIGatewayProxyEvent): string => {
 
 export const transcribe = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
+    console.log('Transcribe event:', JSON.stringify(event, null, 2));
+    
     if (!event.body) {
       return badRequest('Request body is required');
     }
 
     const body: TranscribeRequest = JSON.parse(event.body);
-    
+
     if (!body.audioFile || !body.conversationId || !body.language) {
       return badRequest('audioFile, conversationId, and language are required');
     }
 
-    const userId = getUserId(event);
-    
-    // Verify conversation belongs to user
-    await getConversation(body.conversationId, userId);
+    // Get userId from body or headers
+    const userId = body.userId || getUserId(event);
+    if (!userId) {
+      return badRequest('User ID is required');
+    }
+
+    // Get conversation
+    const conversation = await getConversation(body.conversationId);
 
     // Transcribe audio using Deepgram
+    console.log('Starting transcription...');
     const transcribedText = await transcribeAudio(body.audioFile, body.language);
+    // const transcribedText = 'Hello, do you what do you like to eat?';
+    console.log('Transcription completed:', transcribedText);
 
     // Save user message to database
-    const interaction = await createInteraction(body.conversationId, transcribedText);
+    console.log('Creating user interaction...');
+    const interaction = await createInteraction(body.conversationId, transcribedText, 'user');
+    console.log('User interaction created:', interaction.id);
 
     return success({
       text: transcribedText,
@@ -42,8 +53,19 @@ export const transcribe = async (event: APIGatewayProxyEvent): Promise<APIGatewa
     });
   } catch (error: any) {
     console.error('Transcribe error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      statusCode: error.statusCode,
+      stack: error.stack
+    });
+    
     if (error.message.includes('No rows')) {
       return notFound('Conversation not found');
+    }
+    
+    // Use internalServerError for unhandled exceptions to ensure CORS headers are included
+    if (error.statusCode >= 500 || !error.statusCode) {
+      return internalServerError(error.message || 'Failed to transcribe audio');
     }
     return error(error.message || 'Failed to transcribe audio', 400);
   }
@@ -51,6 +73,8 @@ export const transcribe = async (event: APIGatewayProxyEvent): Promise<APIGatewa
 
 export const generateResponse = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
+    console.log('Generate response event:', JSON.stringify(event, null, 2));
+    
     if (!event.body) {
       return badRequest('Request body is required');
     }
@@ -60,57 +84,79 @@ export const generateResponse = async (event: APIGatewayProxyEvent): Promise<API
     if (!body.text || !body.conversationId || !body.language) {
       return badRequest('text, conversationId, and language are required');
     }
-
-    const userId = getUserId(event);
     
-    // Verify conversation belongs to user
-    const conversation = await getConversation(body.conversationId, userId);
+    // Get conversation
+    const conversation = await getConversation(body.conversationId);
 
     // Get conversation history for context
     const interactions = await getConversationInteractions(body.conversationId);
     const conversationHistory = interactions
-      .filter(i => i.user_message && i.ai_response)
-      .map(i => [
-        { role: 'user' as const, content: i.user_message },
-        { role: 'assistant' as const, content: i.ai_response }
-      ])
-      .flat();
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .filter(i => i.sender === 'user' || i.sender === 'ai')
+      .map(i => ({
+        role: i.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: i.message
+      }));
 
     // Generate AI response using OpenAI
+    console.log('Generating AI response...');
+
+    const languageToVoiceId = {
+      'en': {voiceId: 'cgSgspJ2msm6clMCkdW9', gender: 'female', name: 'Alice'},
+      'es': {voiceId: 'EXAVITQu4vr4xnSDxMaL', gender: 'female', name: 'Alice'},
+      'fr': {voiceId: '4VZIsMPtgggwNg7OXbPY', gender: 'male', name: 'James'},
+      'it': {voiceId: 'Xb7hH8MSUJpSbSDYk0k2', gender: 'female', name: 'Alice'},
+      'ja': {voiceId: 'PmgfHCGeS5b7sH90BOOJ', gender: 'female', name: 'Alice'},
+      'ko': {voiceId: 'AW5wrnG1jVizOYY7R1Oo', gender: 'female', name: 'Alice'},
+      'zh': {voiceId: '4VZIsMPtgggwNg7OXbPY', gender: 'male', name: 'James'},
+    };
+
+    const {voiceId, gender, name} = languageToVoiceId[conversation.language as keyof typeof languageToVoiceId];
+
+    /////////////////////////////////////////////////////UNCOMMENT THIS WHEN READY TO USE OPENAI ///////////////////////////
     const aiResponse = await chatGenerateResponse(
       body.text,
       conversation.language,
-      conversationHistory
+      conversationHistory,
+      gender,
+      name
     );
 
+    // const aiResponse = 'Hi Shawn, I like to eat pizza and burgers.';
+    console.log('AI response generated:', aiResponse.substring(0, 100) + '...');
+
+
     // Convert AI response to speech using 11Labs
-    const audioFile = await textToSpeech(aiResponse);
+    console.log('Converting to speech...');
 
-    // Find the interaction to update (should be the most recent one with the user message)
-    const recentInteraction = interactions
-      .filter(i => i.user_message === body.text && !i.ai_response)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    const audioFile = await textToSpeech(aiResponse, voiceId);
+    console.log('Speech conversion completed');
 
-    let interactionId: string;
-    if (recentInteraction) {
-      // Update existing interaction
-      const updatedInteraction = await updateInteraction(recentInteraction.id, aiResponse);
-      interactionId = updatedInteraction.id;
-    } else {
-      // Create new interaction (fallback)
-      const newInteraction = await createInteraction(body.conversationId, body.text, aiResponse);
-      interactionId = newInteraction.id;
-    }
+    // Create new AI interaction
+    console.log('Creating AI interaction...');
+    const aiInteraction = await createInteraction(body.conversationId, aiResponse, 'ai');
+    console.log('AI interaction created:', aiInteraction.id);
 
     return success({
       aiResponse,
       audioFile,
-      interactionId,
+      interactionId: aiInteraction.id,
     });
   } catch (error: any) {
     console.error('Generate response error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      statusCode: error.statusCode,
+      stack: error.stack
+    });
+    
     if (error.message.includes('No rows')) {
       return notFound('Conversation not found');
+    }
+    
+    // Use internalServerError for unhandled exceptions to ensure CORS headers are included
+    if (error.statusCode >= 500 || !error.statusCode) {
+      return internalServerError(error.message || 'Failed to generate response');
     }
     return error(error.message || 'Failed to generate response', 400);
   }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { MessageCircle, Plus, Languages, Clock, Trash2, LogOut, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,13 +23,87 @@ interface Conversation {
 interface Language {
   code: string;
   name: string;
-  native_name: string;
+  // native_name: string;
 }
+
+const codeToLanguage = {
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'it': 'Italian',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'zh': 'Mandarin (simplified)',
+}
+
+const nativeNameToCode = {
+  'English': 'en',
+  'Spanish': 'es',
+  'French': 'fr',
+  'German': 'de',
+  'Italian': 'it',
+  'Portuguese': 'pt',
+  'Russian': 'ru',
+  'Japanese': 'ja',
+  'Korean': 'ko',
+  'Mandarin (simplified)': 'zh',
+}
+
+const languageToVoiceId = {
+  'en': {voiceId: 'cgSgspJ2msm6clMCkdW9', gender: 'female', name: 'Alice'},
+  'es': {voiceId: 'iyvXhCAqzDxKnq3FDjZl', gender: 'female', name: 'Alice'},
+  'fr': {voiceId: 'gaiKXUXMtA8O5fyBjiS9', gender: 'male', name: 'James'},
+  'it': {voiceId: 'b8jhBTcGAq4kQGWmKprT', gender: 'female', name: 'Alice'},
+  'ja': {voiceId: 'PmgfHCGeS5b7sH90BOOJ', gender: 'femmale', name: 'Alice'},
+  'ko': {voiceId: 'AW5wrnG1jVizOYY7R1Oo', gender: 'female', name: 'Alice'},
+  'zh': {voiceId: '4VZIsMPtgggwNg7OXbPY', gender: 'male', name: 'James'},
+}
+
 
 const Dashboard = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [chatTitle, setChatTitle] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [languages, setLanguages] = useState<Language[]>([]);
+  const [languages, setLanguages] = useState<Language[]>([
+    {
+      code: 'en',
+      name: 'English',
+      // native_name: 'English'
+    },
+    {
+      code: 'es',
+      name: 'Spanish',
+      // native_name: 'Español'
+    },
+    {
+      code: 'fr',
+      name: 'French',
+      // native_name: 'Français'
+    },
+    {
+      code: 'it',
+      name: 'Italian',
+      // native_name: 'Italiano'
+    },
+    {
+      code: 'ja',
+      name: 'Japanese',
+      // native_name: '日本語'
+    },
+    {
+      code: 'ko',
+      name: 'Korean',
+      // native_name: '한국어'
+    },
+    {
+      code: 'zh',
+      name: 'Mandarin (simplified)',
+      // native_name: '中文'
+    }
+  ]);
   const [loading, setLoading] = useState(true);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -42,26 +117,24 @@ const Dashboard = () => {
         // Get user ID from localStorage
         const savedUser = localStorage.getItem('lingobuddy_user');
         const userId = savedUser ? JSON.parse(savedUser).id : null;
-        
+        console.log(userId)
         if (!userId) return;
 
-        const [conversationsRes, languagesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/conversations`, {
-            headers: { 'X-User-Id': userId }
-          }),
-          fetch(`${API_BASE_URL}/languages`)
-        ]);
 
-        const conversationsData = await conversationsRes.json();
-        const languagesData = await languagesRes.json();
+        const conversations = await fetch(`${API_BASE_URL}/allconversations/${userId}`).then(res => res.json());
+
+        console.log(conversations)
+
+        const conversationsData = await conversations;
+        // const languagesData = await languagesRes.json();
 
         if (conversationsData.success) setConversations(conversationsData.data);
-        if (languagesData.success) setLanguages(languagesData.data);
+        // if (languagesData.success) setLanguages(languagesData.data);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
           title: "Error",
-          description: "Failed to load conversations and languages",
+          description: "Failed to load conversations",
           variant: "destructive",
         });
       } finally {
@@ -83,11 +156,11 @@ const Dashboard = () => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-User-Id': userId
         },
         body: JSON.stringify({
-          language: selectedLanguage,
-          title: `${selectedLanguage} Practice`
+          language: nativeNameToCode[selectedLanguage],
+          title: chatTitle.trim() || `${selectedLanguage} Practice`,
+          userId: userId
         })
       });
       
@@ -196,30 +269,42 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a language to practice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {languages.map((language) => (
-                        <SelectItem key={language.code} value={language.name}>
-                          {language.native_name} ({language.name})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a language to practice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {languages.map((language) => (
+                          <SelectItem key={language.code} value={language.name}>
+                            {language.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Enter a custom title (optional)"
+                      value={chatTitle}
+                      onChange={(e) => setChatTitle(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
-                <Button 
-                  onClick={handleStartNewChat}
-                  disabled={!selectedLanguage}
-                  variant="gradient"
-                  className="gap-2"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Start Chatting
-                </Button>
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleStartNewChat}
+                    disabled={!selectedLanguage}
+                    variant="gradient"
+                    className="gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Start Chatting
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -253,7 +338,7 @@ const Dashboard = () => {
               </Card>
             ) : (
               <div className="grid gap-4">
-                {conversations.map((conversation) => (
+                {conversations.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((conversation) => (
                   <Card 
                     key={conversation.id}
                     className="shadow-soft border-0 bg-gradient-card hover:shadow-medium transition-all duration-300 cursor-pointer group"
@@ -264,18 +349,15 @@ const Dashboard = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <Badge className="bg-gradient-primary text-primary-foreground">
-                              {conversation.language}
+                              {codeToLanguage[conversation.language as keyof typeof codeToLanguage] || conversation.language}
                             </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              {conversation.interactions?.length || 0} messages
-                            </span>
+                            <p className="text-sm text-muted-foreground font-medium">
+                              {conversation.title || `${codeToLanguage[conversation.language as keyof typeof codeToLanguage] || conversation.language} Practice`}
+                            </p>
                             <span className="text-sm text-muted-foreground">
                               {formatTimeAgo(conversation.created_at)}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground font-medium">
-                            {conversation.title || `${conversation.language} Practice`}
-                          </p>
                         </div>
                         
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
